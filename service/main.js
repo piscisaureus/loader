@@ -45,7 +45,7 @@ async function onfetch(event) {
     let loaderUrl = new URL(loaderImportSpecifier, referrerUrl);
     const loaderInfo = getOrCreateLoader(clientId, loaderUrl);
     addLoaderToModule(clientId, referrerUrl, loaderInfo);
-    return dummyModule();
+    return dummyModuleRedirect();
   } else if (pathname === "/favicon.ico") {
     // Because all those failing requests annoy me.
     return favicon();
@@ -55,8 +55,9 @@ async function onfetch(event) {
   }
 }
 
-function dummyModule() {
-  return new Response(`export default undefined;`, js_headers());
+function dummyModuleRedirect() {
+  let dummyModuleUrl = new URL("./service/dummy.js", globalThis.location);
+  return Response.redirect(dummyModuleUrl, 302);
 }
 
 function js_headers() {

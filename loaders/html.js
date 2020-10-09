@@ -1,6 +1,9 @@
 export default async function (request) {
   let response = await fetch(request);
-  if (response.headers.get("Content-Type").startsWith("text/html")) {
+  if (
+    !response.redirected &&
+    response.headers.get("Content-Type").startsWith("text/html")
+  ) {
     // Convert HTML snippet to a module that exports a DOM DocumentFragment.
     // WARNING: demo material only. This will execute scripts!
     const source = `\
