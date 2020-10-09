@@ -3,18 +3,18 @@ export default async function (request) {
   if (response.headers.get("Content-Type").startsWith("text/html")) {
     // Convert HTML snippet to a module that exports a DOM DocumentFragment.
     // WARNING: demo material only. This will execute scripts!
-    return new Response(
-      `const html = ${JSON.stringify(await response.text())};
-       const fragment = document
-         .createRange()
-         .createContextualFragment(html);
-        export default fragment;`,
-      {
-        headers: { "Content-Type": "application/javascript" },
-      }
-    );
+    const source = `\
+      const html = ${JSON.stringify(await response.text())};
+      const fragment = document
+        .createRange()
+        .createContextualFragment(html);
+      export default fragment;
+    `;
+    return new Response(source, {
+      headers: { "Content-Type": "application/javascript" },
+    });
   } else {
-    // Pass through everything else unmodified.
+    // Pass through non-HTML responses unmodified.
     return response;
   }
 }

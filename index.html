@@ -4,7 +4,29 @@
     <meta charset="utf-8" />
     <!-- Set up the infrastructure that makes loader hooks work. -->
     <script type="module" src="service/init.js"></script>
-    <!-- These are regular 'user' modules; they can use of loader hooks now. -->
+
+    <!--
+      These are regular 'user' modules, but they can request the use of custom
+      loader hooks now.
+
+      # About the script type
+
+      The `script type` attribute is set to "denodule" here; the loader service
+      will change the type to "module" later.
+
+      This is not a very critical or important part of the design however. It
+      works around the problem that Chrome tries to fully resolve the module
+      tree for 'service/init.js' and 'app1|2.js' as a single unit. Since
+      'app1|2.js' depend on the loader service to be available, fully loading
+      the module tree doesn't succeed; subsequently Chrome doesn't even run
+      'service/init.js', and we're stuck.
+
+      An alternative solution is to use `type="module"` as usual, while also
+      adding the `async` attribute, like this:
+      ```
+      <script type="module" src="app1.js" async></script>
+      ```
+    -->
     <script type="denodule" src="app1.js"></script>
     <script type="denodule" src="app2.js"></script>
   </head>
