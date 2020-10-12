@@ -1,0 +1,30 @@
+[package]
+name = "import_scanner"
+version = "0.1.0"
+authors = ["Bert Belder <bertbelder@gmail.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+swc_common = "0.10.3"
+swc_ecmascript = { version = "0.9.3", default-features = false, features = [
+  "parser",
+  "visit"
+] }
+serde = { version = "1.0.116", features = ["derive"] }
+serde_derive = "1.0.116"
+serde_json = { version = "1.0.58", features = ["preserve_order"] }
+wasm-bindgen = { version = "0.2.68", features = ["serde-serialize"] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.18"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-mutable-globals"]
+
+[profile.release]
+lto = "fat"
+opt-level = "z"
+panic = "abort"
