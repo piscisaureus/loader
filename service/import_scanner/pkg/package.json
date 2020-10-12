@@ -1,0 +1,12 @@
+{
+  "name": "import_scanner",
+  "collaborators": [
+    "Bert Belder <bertbelder@gmail.com>"
+  ],
+  "version": "0.1.0",
+  "files": [
+    "import_scanner_bg.wasm",
+    "import_scanner.js"
+  ],
+  "browser": "import_scanner.js"
+}
