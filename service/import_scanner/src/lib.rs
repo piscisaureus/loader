@@ -24,11 +24,9 @@ pub struct ImportDescriptor {
 }
 
 #[wasm_bindgen]
-pub fn get_imports(source: &[u8]) -> Box<[u8]> {
-  let source = String::from_utf8_lossy(source).into();
+pub fn get_imports(source: String) -> String {
   let imports = get_imports_impl(source).ok();
-  let json = serde_json::to_vec(&imports).unwrap();
-  json.into_boxed_slice()
+  serde_json::to_string(&imports).unwrap()
 }
 
 #[inline(always)]
@@ -140,7 +138,7 @@ mod tests {
   #[test]
   #[wasm_bindgen_test]
   fn test_ok() {
-    let source = br#"
+    let source = r#"
 import something from "../module_with_default_export.js";
 import { something_else } from "ordinary_module";
 import * as everything from "some_other_module.js";
@@ -235,17 +233,15 @@ import "repeated_import";
         "line": 20
       }
     ]);
-    let actual = get_imports(source);
-    let expected = serde_json::to_vec(&imports_json)
-      .unwrap()
-      .into_boxed_slice();
+    let actual = get_imports(source.to_owned());
+    let expected = serde_json::to_string(&imports_json).unwrap();
     assert_eq!(actual, expected);
   }
 
   #[test]
   #[wasm_bindgen_test]
   fn test_err() {
-    let r = get_imports(b"{;");
-    assert_eq!(r, b"null"[..].into());
+    let json = get_imports("{;".to_owned());
+    assert_eq!(&json, "null");
   }
 }
