@@ -51,7 +51,8 @@ async function setup(event) {
       ports: [replyPort],
     } = event;
     const request = new Request(...requestArgs);
-    const response = await loaderFetch(request);
+    const response =
+      (await loaderFetch(request)) ?? (await outboundFetch(request));
     const responseArgs = await deconstructResponseObject(response);
     replyPort.postMessage(responseArgs);
   });

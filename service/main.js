@@ -1,14 +1,20 @@
 // Of course we'd like to use `import` instead, but unfortunately Chrome doesn't
 // support modules as service workers...
-importScripts("./service//util.js");
+importScripts("./service/util.js");
 
-self.addEventListener("fetch", (event) => {
-  event.respondWith(maybeFetch(event));
-});
+const importScannerBase = "./service/import_scanner/pkg/import_scanner";
+importScripts(`${importScannerBase}.js`);
+const importScannerReady = wasm_bindgen(`${importScannerBase}_bg.wasm`);
 
-async function maybeFetch(event) {
-  return (await onfetch(event)) ?? (await fetch(event.request));
+async function getImports(source) {
+  await importScannerReady;
+  const r = wasm_bindgen.get_imports(source);
+  return JSON.parse(r);
 }
+
+self.addEventListener("fetch", (event) =>
+  event.respondWith((() => onfetch(event))())
+);
 
 async function onfetch(event) {
   const { clientId, request } = event;
@@ -22,9 +28,8 @@ async function onfetch(event) {
     )
   ) {
     console.warn(
-      `Can't intercept request to ${request.url} because of referrer policy '${request.referrerPolicy}'`
+      `Can't intercept request to ${request.url} because of referrer policy '${request.referrerPolicy}'. Got referrer: '${request.referrer}'.`
     );
-    return;
   }
 
   const url = new URL(request.url);
@@ -35,7 +40,7 @@ async function onfetch(event) {
   if (pathname.endsWith("/service/verify.js")) {
     // Return an empty module. If the worker isn't active, the actual
     // `verify.js` file is loaded which will reload the page.
-    return new Response("export default undefined;", js_headers());
+    return dummyModuleRedirect();
   } else if (/\/service(\.js|\/)/.test(pathname)) {
     // Ignore to stay sane.
   } else if (
@@ -53,15 +58,34 @@ async function onfetch(event) {
     const referrerInfo = getOrCreateModuleInfo(clientId, referrerUrl);
     return referrerInfo.fetch(request);
   }
+
+  const referrerInfo = getOrCreateModuleInfo(clientId, referrerUrl);
+  const response = await referrerInfo.fetch(request);
+
+  if (
+    (request.destination === "script" || request.destination === "worker") &&
+    !response.redirect &&
+    response.headers.get("Content-Type") === "application/javascript"
+  ) {
+    let source = await response.clone().text();
+    let imports = await getImports(source);
+    createModuleInfo(clientId, url, { imports });
+  }
+
+  return response;
 }
 
 function dummyModuleRedirect() {
-  let dummyModuleUrl = new URL("./service/dummy.js", globalThis.location);
+  let dummyModuleUrl = new URL("./service/dummy.js#", location);
   return Response.redirect(dummyModuleUrl, 302);
 }
 
 function js_headers() {
-  return { headers: { "Content-Type": "application/javascript" } };
+  return {
+    headers: {
+      "Content-Type": "application/javascript",
+    },
+  };
 }
 
 function html_headers() {
@@ -164,7 +188,9 @@ async function generateLoaderImpl(loaderUrl) {
   return loaderFetch;
 }
 
-defaultFetchImpl = fetch.bind(globalThis);
+function defaultFetchImpl(...args) {
+  return fetch(...args);
+}
 
 async function getWindowClient() {
   let clients = await self.clients.matchAll({ type: "window" });
@@ -175,17 +201,31 @@ async function getWindowClient() {
   return windowClient;
 }
 
-function getOrCreateModuleInfo(clientId, moduleUrl) {
-  let moduleKey = `${clientId}+${moduleUrl}`;
-  let moduleInfo = moduleMap.get(moduleKey);
-  if (moduleInfo == null) {
-    moduleInfo = {
-      url: moduleUrl,
-      fetch: defaultFetchImpl,
-    };
-    moduleMap.set(moduleKey, moduleInfo);
-  }
+function makeModuleKey(clientId, moduleUrl) {
+  return `${clientId}\0${moduleUrl}`;
+}
+
+function createModuleInfo(clientId, moduleUrl, init = {}) {
+  const moduleKey = makeModuleKey(clientId, moduleUrl);
+  const moduleInfo = {
+    url: moduleUrl,
+    fetch: defaultFetchImpl,
+    options: {},
+    ...init,
+  };
+  moduleMap.set(moduleKey, moduleInfo);
   return moduleInfo;
+}
+
+function getModuleInfo(clientId, moduleUrl) {
+  const moduleKey = makeModuleKey(clientId, moduleUrl);
+  return moduleMap.get(moduleKey);
+}
+
+function getOrCreateModuleInfo(clientId, moduleUrl) {
+  return (
+    getModuleInfo(clientId, moduleUrl) ?? createModuleInfo(clientId, moduleUrl)
+  );
 }
 
 function addLoaderToModule(clientId, moduleUrl, loaderInfo) {
